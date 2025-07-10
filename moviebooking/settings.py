@@ -53,6 +53,7 @@ EMAIL_HOST_USER = config("HOST")
 EMAIL_HOST_PASSWORD = config("HOST_PASSWORD")
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -60,7 +61,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-     "corsheaders.middleware.CorsMiddleware",
+     
 ]
 
 ROOT_URLCONF = 'moviebooking.urls'
@@ -136,20 +137,18 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOW_ALL_ORIGINS = False  # Recommended: use specific domains
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:5173",  # React (Vite) dev server
-# ]
+CORS_ALLOW_ALL_ORIGINS = False
 
-# CSRF_TRUSTED_ORIGINS = [
-#     "http://localhost:5173",  # Needed for CSRF protection if using SessionAuth
-# ]
+
 CORS_ALLOWED_ORIGINS = [
-    "https://moviebooking-flow.netlify.app/",  # React (Vite) dev server
+    "http://localhost:5173",  # For local dev
+    "https://moviebooking-flow.netlify.app",  # Your deployed frontend
 ]
+
+CORS_ALLOW_CREDENTIALS = True
+
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://moviebooking-flow.netlify.app/",  # Needed for CSRF protection if using SessionAuth
+    "http://localhost:5173",
+    "https://moviebooking-flow.netlify.app",
 ]
-#CORS_ALLOW_CREDENTIALS = True
