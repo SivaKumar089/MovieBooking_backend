@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Verification</title>
+</head>
+
+<body style="margin: 0; padding: 0; background: #f9fafb; font-family: Arial, sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding: 20px 0;">
+    <tr>
+      <td align="center">
+
+        <table width="600" cellpadding="0" cellspacing="0" style="background: white; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); padding: 40px; text-align: center;">
+
+          <!-- Header -->
+          <tr>
+            <td style="padding-bottom: 24px;">
+              <h1 style="margin: 0; font-size: 24px; color: #1d4ed8;">Email Verification</h1>
+              <p style="color: #6b7280; font-size: 14px;">Please confirm your email address to continue</p>
+            </td>
+          </tr>
+
+          <!-- Greeting -->
+          <tr>
+            <td style="padding: 16px 0; color: #374151; font-size: 16px;">
+              Hello <strong>{{ email }}</strong>,<br/>
+              Use the code below to verify your email address:
+            </td>
+          </tr>
+
+          <!-- OTP Box -->
+          <tr>
+            <td style="padding: 20px 0;">
+              <div style="display: inline-block; padding: 16px 32px; border-radius: 8px; background: #e0f2fe; color: #1d4ed8; font-size: 32px; letter-spacing: 4px; font-weight: bold;">
+                {{ otp_code }}
+              </div>
+            </td>
+          </tr>
+
+          <!-- Expiry Info -->
+          <tr>
+            <td style="color: #6b7280; font-size: 14px; padding-bottom: 24px;">
+              This code is valid for 5 minutes.<br/>
+              If you didn’t request this, you can safely ignore this email.
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: left;">
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td width="60">
+                    <img src="https://i.ibb.co/20L3DRsN/siva.jpg" alt="Siva Kumar"
+                      style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover;">
+                  </td>
+                  <td style="font-size: 12px; color: #6b7280;">
+                    <p style="margin: 0; font-weight: 600; color: #111827;">Siva Kumar</p>
+                    <p style="margin: 0;">kumarsiva200426@gmail.com</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+</body>
+
+</html>

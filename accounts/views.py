@@ -12,8 +12,9 @@ import random
 from django.core.mail import send_mail
 from django.conf import settings
 from rest_framework import status
+from django.contrib.auth import get_user_model
 
- 
+User = get_user_model() 
 class SignupView(generics.ListCreateAPIView):
     queryset = User.objects.all()
     serializer_class = SignupSerializer
@@ -26,6 +27,73 @@ class SignupView(generics.ListCreateAPIView):
             queryset = queryset.filter(role=role)
         return queryset
     
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string,get_template
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from .models import OTP
+import random
+
+User = get_user_model()
+
+class EmailOTPRequestView(APIView):
+    def post(self, request):
+        serializer = OTPRequestSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+
+            if User.objects.filter(email=email).exists():
+                return Response({"error": "Email already registered."}, status=400)
+
+            # Generate OTP
+            code = str(random.randint(100000, 999999))
+
+            # Save OTP with email
+            EmailOTP.objects.create(email=email,code=code)
+
+            # Load email template
+            html_template = get_template("email_verify.html")
+            html_content = html_template.render({'email':email,'otp_code': code})
+
+            subject = "Your OTP Code"
+            from_email = settings.EMAIL_HOST_USER
+            to_email = [email]  # Send directly to provided email
+
+            email_message = EmailMultiAlternatives(
+                subject=subject,
+                body=f"Your OTP is: {code}",
+                from_email=from_email,
+                to=to_email,
+            )
+            email_message.attach_alternative(html_content, "text/html")
+            email_message.send(fail_silently=False)
+
+            return Response({"message": "OTP sent to email."})
+        return Response(serializer.errors, status=400)
+
+class EmailOTPVerifyView(APIView):
+    def post(self, request):
+        serializer = OTPVerifySerializer(data=request.data)
+        if serializer.is_valid():
+            
+            code = serializer.validated_data['code']
+
+            try:
+                
+                otp = EmailOTP.objects.filter( code=code, is_verified=False).last()
+
+                if not otp or otp.is_expired():
+                    return Response({"error": "Invalid or expired OTP"}, status=400)
+
+                otp.is_verified = True
+                otp.save()
+                return Response({"message": "OTP verified"})
+            except User.DoesNotExist:
+                return Response({"error": "User not found"}, status=404)
+        return Response(serializer.errors, status=400)
+
 
 class LoginView(APIView):
     def post(self, request):
@@ -68,6 +136,9 @@ class ProfileView(generics.RetrieveAPIView):
     def get_object(self):
         return self.request.user
 
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.template.loader import get_template
 class OTPRequestView(APIView):
     def post(self, request):
         serializer = OTPRequestSerializer(data=request.data)
@@ -81,14 +152,22 @@ class OTPRequestView(APIView):
             code = str(random.randint(100000, 999999))
             OTP.objects.create(user=user, code=code)
 
-            # Replace with your mail config
-            send_mail(
-                'Your OTP Code',
-                f'Your OTP is: {code}',
-                settings.EMAIL_HOST_USER,
-                [user.email],
-                fail_silently=False
+            html_template = get_template("otp_email.html")
+            html_content = html_template.render({'user': user, 'otp_code': code})
+
+            subject = "Your OTP Code"
+            from_email = settings.EMAIL_HOST_USER
+            to_email = [user.email]
+
+            email_message = EmailMultiAlternatives(
+                subject=subject,
+                body="Your OTP is: " + code,
+                from_email=from_email,
+                to=to_email,
             )
+            email_message.attach_alternative(html_content, "text/html")
+            email_message.send(fail_silently=False)
+
             return Response({"message": "OTP sent to email"})
         return Response(serializer.errors, status=400)
 
