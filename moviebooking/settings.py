@@ -88,16 +88,28 @@ TEMPLATES = [
 #     },
 # ]
 
+
 WSGI_APPLICATION = 'moviebooking.wsgi.application'
 
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'moviebooking_db_n7yh',
+        'USER': 'root',
+        'PASSWORD': 'Sxpfop2JlJUmPCaKDblieWY2YIIENg5e',
+        'HOST': 'dpg-d1tnbo2dbo4c73dpede0-a.oregon-postgres.render.com',
+        'PORT': '5432',
     }
 }
 
