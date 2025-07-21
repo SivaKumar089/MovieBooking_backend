@@ -162,7 +162,7 @@ CORS_ALLOW_ALL_ORIGINS = False
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # For local dev
-    "https://moviebooking-flow.netlify.app",  # Your deployed frontend
+    "https://bookit-web.netlify.app",  # Your deployed frontend
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -170,5 +170,5 @@ CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
-    "https://moviebooking-flow.netlify.app",
+    "https://bookit-web.netlify.app",
 ]
