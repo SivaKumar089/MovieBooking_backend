@@ -14,14 +14,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-rl48_5391_7=fjgfu&l-k)*t(&ia6+)@5laef&&2hqcwjlh=4q'
+SECRET_KEY =os.getenv('PROJECT_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True if os.getenv("DEBUG") == "True" else False
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS").split(",") if os.getenv("ALLOWED_HOSTS") else []
 
-
+print(ALLOWED_HOSTS)
 # Application definition
 
 INSTALLED_APPS = [
@@ -49,8 +49,9 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = config("HOST")
-EMAIL_HOST_PASSWORD = config("HOST_PASSWORD")
+EMAIL_HOST_USER = os.getenv("HOST")
+EMAIL_HOST_PASSWORD = os.getenv("HOST_PASSWORD")
+
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -95,23 +96,23 @@ WSGI_APPLICATION = 'moviebooking.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
-
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'moviebooking_db_n7yh',
-        'USER': 'root',
-        'PASSWORD': 'Sxpfop2JlJUmPCaKDblieWY2YIIENg5e',
-        'HOST': 'dpg-d1tnbo2dbo4c73dpede0-a.oregon-postgres.render.com',
-        'PORT': '5432',
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME':os.getenv('DATABASE_NAME'),
+#         'USER':os.getenv('DATABASE_USERNAME') ,
+#         'PASSWORD':os.getenv('DATABASE_PASSWORD') ,
+#         'HOST': os.getenv('DATABASE_HOSTNAME'),
+#         'PORT': '5432',
+#     }
+# }
 
 
 # Password validation

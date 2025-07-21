@@ -1,14 +1,9 @@
 from rest_framework import generics, permissions
-from .models import Theater, Movie, Show, Seat
-from .serializers import *
-
-from .permissions import IsAdminOrOwner,IsOwner
-
-from rest_framework import generics, permissions
-from .models import Theater
-from .serializers import TheaterSerializer
-from .permissions import IsAdminOrOwner
 from rest_framework.permissions import AllowAny
+from .models import *
+from .serializers import *
+from .permissions import *
+
 class TheaterListCreateView(generics.ListCreateAPIView):
     serializer_class = TheaterSerializer
     permission_classes = [AllowAny]  # All roles must be logged in
@@ -42,10 +37,7 @@ class TheaterRetrieveUpdateView(generics.RetrieveUpdateAPIView):
     
  
 
-from rest_framework import generics, permissions
-from .models import *
-from .serializers import *
-from .permissions import *
+
 
 class MovieListCreateView(generics.ListCreateAPIView):
     serializer_class = MovieSerializer
@@ -87,20 +79,25 @@ class MovieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
 
 
 
-
 class ShowListCreateView(generics.ListCreateAPIView):
-    queryset = Show.objects.all().select_related('movie', 'theater')
     serializer_class = ShowSerializer
+    queryset = Show.objects.all().select_related('movie', 'theater')
 
     def get_permissions(self):
         if self.request.method == 'POST':
             return [permissions.IsAuthenticated(), IsOwner()]
-        return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]  # restrict to logged in users
 
     def get_queryset(self):
         queryset = super().get_queryset()
         movie_id = self.request.query_params.get('movie')
 
+        user = self.request.user
+        # If user is owner, show only their own shows
+        if user.role == 'owner':  # assuming 'role' is a field on AbstractUser
+            queryset = queryset.filter(owner=user)
+
+        # Optional movie filter
         if movie_id:
             queryset = queryset.filter(movie_id=movie_id)
 
