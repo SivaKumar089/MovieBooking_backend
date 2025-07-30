@@ -1,11 +1,11 @@
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password, check_password
 from .models import User, OwnerProfile, OTP
-
 class SignupSerializer(serializers.ModelSerializer):
+    theater_count = serializers.IntegerField(read_only=True)
     class Meta:
         model = User
-        fields = ['id','username', 'email','password','role']
+        fields = ['id','username', 'email','password','role','theater_count']
     
     def create(self, validated_data):
         validated_data['password'] = make_password(validated_data['password'])

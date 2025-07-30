@@ -7,17 +7,12 @@ class TheaterSerializer(serializers.ModelSerializer):
         model = Theater
         fields = ['id', 'name', 'location', 'owner']
         
-
-
-
-
 class MovieSerializer(serializers.ModelSerializer):
-    #theater = serializers.PrimaryKeyRelatedField(read_only=True)
-    #owner = serializers.PrimaryKeyRelatedField(read_only=True)
-   
+    theater_name = serializers.CharField(source='theater.name', read_only=True)
+
     class Meta:
         model = Movie
-        fields = ['id', 'title', 'description', 'duration_minutes', 'language','theater', 'release_date','owner']
+        fields = ['id', 'title', 'description', 'duration_minutes', 'language','theater', 'release_date','owner','theater_name']
 
 class SeatSerializer(serializers.ModelSerializer):
     booked_by = serializers.SerializerMethodField()
@@ -54,15 +49,3 @@ class ShowSerializer(serializers.ModelSerializer):
 
     def get_available_seats(self, obj):
         return Seat.objects.filter(show=obj, is_booked=False).count()
-
-
-
-
-# class ShowDetailSerializer(serializers.ModelSerializer):
-#     movie = MovieSerializer()
-#     theater = TheaterSerializer()
-#     seats = SeatSerializer(many=True)
-
-#     class Meta:
-#         model = Show
-#         fields = ['id', 'movie', 'theater', 'start_time', 'end_time', 'date', 'seats']

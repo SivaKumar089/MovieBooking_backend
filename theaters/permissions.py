@@ -3,7 +3,6 @@ from rest_framework import permissions
 class IsOwner(permissions.BasePermission):
     def has_permission(self, request, view):
         return request.user and request.user.is_authenticated and request.user.role == 'owner'
-# permissions.py
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
 class IsAdminOrOwner(BasePermission):
@@ -54,8 +53,6 @@ class IsAdminOrOwnerCanEdit(permissions.BasePermission):
     """
 
     def has_object_permission(self, request, view, obj):
-        # SAFE_METHODS are always allowed
         if request.method in permissions.SAFE_METHODS:
             return True
-        # Admin or Owner of movie can edit/delete
         return request.user.is_superuser or obj.owner == request.user

@@ -6,7 +6,7 @@ from .permissions import *
 
 class TheaterListCreateView(generics.ListCreateAPIView):
     serializer_class = TheaterSerializer
-    permission_classes = [AllowAny]  # All roles must be logged in
+    permission_classes = [AllowAny] 
 
     def get_queryset(self):
         user = self.request.user
@@ -48,7 +48,6 @@ class MovieListCreateView(generics.ListCreateAPIView):
         user = self.request.user
         queryset = super().get_queryset()
 
-        # Filter based on role
         if user.is_superuser or user.role == 'user':
             queryset = Movie.objects.all()
         elif user.role == 'owner':
@@ -56,7 +55,6 @@ class MovieListCreateView(generics.ListCreateAPIView):
         else:
             return Movie.objects.none()
 
-        # Additional filtering by theater ID
         theater = self.request.query_params.get("theater")
         if theater:
             queryset = queryset.filter(theater_id=theater)
@@ -86,18 +84,16 @@ class ShowListCreateView(generics.ListCreateAPIView):
     def get_permissions(self):
         if self.request.method == 'POST':
             return [permissions.IsAuthenticated(), IsOwner()]
-        return [permissions.IsAuthenticated()]  # restrict to logged in users
-
+        return [permissions.IsAuthenticated()] 
     def get_queryset(self):
         queryset = super().get_queryset()
         movie_id = self.request.query_params.get('movie')
 
         user = self.request.user
-        # If user is owner, show only their own shows
-        if user.role == 'owner':  # assuming 'role' is a field on AbstractUser
+       
+        if user.role == 'owner': 
             queryset = queryset.filter(owner=user)
 
-        # Optional movie filter
         if movie_id:
             queryset = queryset.filter(movie_id=movie_id)
 
@@ -109,7 +105,7 @@ class ShowListCreateView(generics.ListCreateAPIView):
 class ShowRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Show.objects.all().select_related('movie', 'theater')
     serializer_class = ShowSerializer
-    permission_classes = [permissions.AllowAny]  # Customize as neede#
+    permission_classes = [permissions.AllowAny]  
             
 class SeatListCreateView(generics.ListCreateAPIView):
     serializer_class = SeatSerializer
@@ -117,23 +113,15 @@ class SeatListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         show_id = self.kwargs['show_id']
-        return Seat.objects.filter(show_id=show_id)
+        return Seat.objects.filter(show_id=show_id).order_by('row', 'column')
+
 
     def perform_create(self, serializer):
         user = self.request.user
         if user.role != 'owner':
             raise PermissionDenied("Only owners can create seats.")
         serializer.save()
-        
-# class SeatDetailView(generics.RetrieveUpdateDestroyAPIView):
-#     queryset = Seat.objects.all()
-#     serializer_class = SeatSerializer
-#     permission_classes = [permissions.IsAuthenticated]
-
-#     def perform_update(self, serializer):
-#         if self.request.user.role != 'owner':
-#             raise PermissionDenied("Only owners can update seats.")
-#         serializer.save()        
+                
         
 
 

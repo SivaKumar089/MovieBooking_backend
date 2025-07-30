@@ -1,7 +1,5 @@
 from rest_framework import permissions
 
-# permissions.py
-
 from rest_framework.permissions import BasePermission
 
 class IsBookingOwner(BasePermission):

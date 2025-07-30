@@ -6,14 +6,16 @@ from django.contrib.auth.hashers import check_password, make_password
 from rest_framework_simplejwt.tokens import RefreshToken
 from .models import *
 from rest_framework.permissions import AllowAny
-from django.db.models import Q
+from django.db.models import Q,Count
 from .serializers import *
 import random
 from django.core.mail import send_mail
 from django.conf import settings
 from rest_framework import status
 from django.contrib.auth import get_user_model
-
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string,get_template
+from .models import OTP
 User = get_user_model() 
 class SignupView(generics.ListCreateAPIView):
     queryset = User.objects.all()
@@ -23,21 +25,13 @@ class SignupView(generics.ListCreateAPIView):
     def get_queryset(self):
         queryset = super().get_queryset()
         role = self.request.query_params.get("role")
+
         if role:
             queryset = queryset.filter(role=role)
+            if role == "owner":
+                queryset = queryset.annotate(theater_count=Count('theater'))
         return queryset
     
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from django.core.mail import EmailMultiAlternatives
-from django.template.loader import render_to_string,get_template
-from django.conf import settings
-from django.contrib.auth import get_user_model
-from .models import OTP
-import random
-
-User = get_user_model()
-
 class EmailOTPRequestView(APIView):
     def post(self, request):
         serializer = OTPRequestSerializer(data=request.data)
@@ -47,19 +41,16 @@ class EmailOTPRequestView(APIView):
             if User.objects.filter(email=email).exists():
                 return Response({"error": "Email already registered."}, status=400)
 
-            # Generate OTP
             code = str(random.randint(100000, 999999))
 
-            # Save OTP with email
             EmailOTP.objects.create(email=email,code=code)
 
-            # Load email template
             html_template = get_template("email_verify.html")
             html_content = html_template.render({'email':email,'otp_code': code})
 
             subject = "Your OTP Code"
             from_email = settings.EMAIL_HOST_USER
-            to_email = [email]  # Send directly to provided email
+            to_email = [email] 
 
             email_message = EmailMultiAlternatives(
                 subject=subject,

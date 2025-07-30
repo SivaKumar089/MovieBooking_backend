@@ -6,7 +6,7 @@ from .models import Booking, Seat, Show, Theater
 from .serializers import *
 from .permissions import IsUser, IsOwner, IsAdmin, IsBookingOwner
 
-# User Booking Seat
+
 class BookingCreateView(APIView):
     permission_classes = [IsUser]
 
@@ -42,7 +42,6 @@ class MyTicketsView(generics.ListAPIView):
     def get_queryset(self):
         return Booking.objects.filter(user=self.request.user, is_cancelled=False)
     
-# Cancel Booking
 class BookingCancelView(APIView):
     permission_classes = [IsUser]
 
@@ -56,13 +55,15 @@ class BookingCancelView(APIView):
         booking.seat.save()
         return Response({"message": "Booking cancelled."}, status=200)
 
-# Admin Get All Bookings
 class AdminBookingListView(generics.ListAPIView):
     permission_classes = [IsAdmin]
     queryset = Booking.objects.all()
     serializer_class = BookingSerializer
+    
+    def get_queryset(self):
+        return Booking.objects.filter(is_cancelled=False)
 
-# Owner Get Theater Bookings
+
 class OwnerBookingListView(generics.ListAPIView):
     permission_classes = [IsOwner]
     serializer_class = BookingSerializer
@@ -70,7 +71,6 @@ class OwnerBookingListView(generics.ListAPIView):
     def get_queryset(self):
         return Booking.objects.filter(show__theater__owner=self.request.user)
 
-# Owner Update Booking (not allowed to change seat, just mark/cancel note or other info)
 class BookingUpdateView(APIView):
     permission_classes = [IsOwner]
 
