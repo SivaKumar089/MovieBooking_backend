@@ -170,3 +170,4 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "https://bookit-web.netlify.app",
 ]
+AUTH_USER_MODEL = "accounts.User"
