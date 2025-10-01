@@ -101,6 +101,7 @@ WSGI_APPLICATION = 'moviebooking.wsgi.application'
 #     }
 # }
 
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
