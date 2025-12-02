@@ -46,11 +46,11 @@ class EmailOTPRequestView(APIView):
             EmailOTP.objects.create(email=email,code=code)
 
             html_template = get_template("email_verify.html")
-            html_content = html_template.render({'email':email,'otp_code': code})
+            html_content = html_template.render({"email": email, "otp_code": code})
 
             subject = "Your OTP Code"
             from_email = settings.EMAIL_HOST_USER
-            to_email = [email] 
+            to_email = [email]
 
             email_message = EmailMultiAlternatives(
                 subject=subject,
@@ -58,8 +58,10 @@ class EmailOTPRequestView(APIView):
                 from_email=from_email,
                 to=to_email,
             )
+
             email_message.attach_alternative(html_content, "text/html")
             email_message.send(fail_silently=False)
+
 
             return Response({"message": "OTP sent to email."})
         return Response(serializer.errors, status=400)
