@@ -47,10 +47,10 @@ REST_FRAMEWORK = {
 # EMAIL_HOST = 'smtp.gmail.com'
 # EMAIL_PORT = 587
 # EMAIL_USE_TLS = True
-EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
-EMAIL_HOST = config("EMAIL_HOST", default="smtp.gmail.com")
-EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
-EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND")
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = os.getenv("EMAIL_PORT")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS")
 EMAIL_HOST_USER = os.getenv("HOST")
 EMAIL_HOST_PASSWORD = os.getenv("HOST_PASSWORD")
 
@@ -168,18 +168,19 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 CORS_ALLOW_ALL_ORIGINS = False
-
 CORS_ALLOW_ALL_HEADERS = True
 
+
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # For local dev
-    "https://bookit-web.netlify.app",  # Your deployed frontend
+    "https://bookit-web.netlify.app",  # Your frontend
+    "http://localhost:5173",           # Local dev
 ]
 
 CORS_ALLOW_CREDENTIALS = True
 
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
     "https://bookit-web.netlify.app",
+    "https://moviebooking-backend-4cmk.onrender.com",
 ]
+
