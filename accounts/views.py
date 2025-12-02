@@ -182,7 +182,7 @@ class OTPVerifyView(APIView):
             except User.DoesNotExist:
                 return Response({"error": "User not found"}, status=404)
         return Response(serializer.errors, status=400)
-
+    
 class ResetPasswordView(APIView):
     def post(self, request):
         serializer = PasswordResetSerializer(data=request.data)

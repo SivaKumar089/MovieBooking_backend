@@ -67,7 +67,7 @@ class MovieListCreateView(generics.ListCreateAPIView):
         if self.request.user.is_superuser or self.request.user.role == 'owner':
             serializer.save(owner=self.request.user)
         else:
-            raise PermissionDenied("Only admin and owner can create movies.")
+            raise permissions.PermissionDenied("Only admin and owner can create movies.")
 
 
 class MovieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
@@ -119,7 +119,7 @@ class SeatListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         user = self.request.user
         if user.role != 'owner':
-            raise PermissionDenied("Only owners can create seats.")
+            raise permissions.PermissionDenied("Only owners can create seats.")
         serializer.save()
                 
         
