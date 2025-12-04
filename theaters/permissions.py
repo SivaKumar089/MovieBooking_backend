@@ -1,58 +1,46 @@
-from rest_framework import permissions
-
-class IsOwner(permissions.BasePermission):
-    def has_permission(self, request, view):
-        return request.user and request.user.is_authenticated and request.user.role == 'owner'
+from rest_framework.permissions import SAFE_METHODS, BasePermission
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
-class IsAdminOrOwner(BasePermission):
-    """
-    Allows access only to users with admin or owner roles for unsafe methods.
-    Safe methods (GET) are allowed for any authenticated user.
-    """
-
+class IsOwner(BasePermission):
     def has_permission(self, request, view):
+        print("=== IsOwner Permission Checking ===")
+        print("Method:", request.method)
+        print("User:", request.user)
+
+        # AUTHENTICATION FIX (request.user is now valid)
+        print("Is Authenticated:", request.user.is_authenticated)
+
         if request.method in SAFE_METHODS:
+            print("Allowed SAFE method")
             return request.user.is_authenticated
-        return request.user.is_authenticated and request.user.role in ['admin', 'owner']
-from rest_framework.permissions import BasePermission
+        
+        role = getattr(request.user, 'role', None)
+        print("User Role:", role)
+        print("POST Allowed:", role in ['admin', 'owner'])
 
-from rest_framework.permissions import BasePermission, SAFE_METHODS
+        return role in ['admin', 'owner']
+
+
+
+
 
 class IsAdminOrOwner(BasePermission):
     def has_permission(self, request, view):
-        return request.user.is_authenticated and request.user.role in ['admin', 'owner']
+        if not request.user.is_authenticated:
+            return False
+        return request.user.role in ['admin', 'owner']
 
     def has_object_permission(self, request, view, obj):
         if request.user.role == 'admin':
             return True
-        if request.user.role == 'owner':
-            return obj.owner == request.user
-        return False
+        return obj.owner == request.user
 
-from rest_framework.permissions import BasePermission, SAFE_METHODS
 
-class IsAdminOrOwnerMovie(BasePermission):
-    def has_permission(self, request, view):
+class IsAdminOrOwnerCanEdit(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        # Allow GET, HEAD, OPTIONS for all authenticated users
         if request.method in SAFE_METHODS:
             return True
-        return request.user.is_authenticated and request.user.role in ['admin', 'owner']
 
-    def has_object_permission(self, request, view, obj):
-        if request.method in SAFE_METHODS:
-            return True
-        return request.user.role == 'admin' or obj.created_by == request.user
-
-from rest_framework import permissions
-
-class IsAdminOrOwnerCanEdit(permissions.BasePermission):
-    """
-    Custom permission:
-    - Admin can edit/delete all
-    - Owner can edit/delete their own movies
-    """
-
-    def has_object_permission(self, request, view, obj):
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        return request.user.is_superuser or obj.owner == request.user
+        # Only owner can edit
+        return obj.owner == request.user

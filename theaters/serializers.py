@@ -1,36 +1,46 @@
 from rest_framework import serializers
 from .models import Theater, Movie, Show, Seat
 from django.contrib.auth import get_user_model
+
 User = get_user_model()
+
+
 class TheaterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Theater
-        fields = ['id', 'name', 'location', 'owner']
-        
+        fields = '__all__'
+
+
+
 class MovieSerializer(serializers.ModelSerializer):
     theater_name = serializers.CharField(source='theater.name', read_only=True)
+    owner_username = serializers.CharField(source='owner.username', read_only=True)
 
     class Meta:
         model = Movie
-        fields = ['id', 'title', 'description', 'duration_minutes', 'language','theater', 'release_date','owner','theater_name']
+        fields = [
+            'id', 'title', 'description', 'duration_minutes', 'language',
+            'theater', 'release_date', 'owner', 'theater_name', 'owner_username'
+        ]
+        read_only_fields = ['owner']
+
 
 class SeatSerializer(serializers.ModelSerializer):
     booked_by = serializers.SerializerMethodField()
 
     class Meta:
         model = Seat
-        fields = ['id', 'row', 'show', 'column', 'is_booked', 'booked_by']
+        fields = ['id', 'row', 'column', 'show', 'is_booked', 'booked_by']
+        read_only_fields = ['is_booked', 'show']
 
     def get_booked_by(self, obj):
-        from bookings.models import Booking  
+        from bookings.models import Booking
         booking = Booking.objects.filter(seat=obj).first()
-        if booking:
-            return booking.user.username  
-        return None
+        return booking.user.username if booking else None
 
 
 class ShowSerializer(serializers.ModelSerializer):
-    owner = serializers.IntegerField(source='owner.id', read_only=True)
+    owner_username = serializers.CharField(source='owner.username', read_only=True)
     movie_name = serializers.CharField(source='movie.title', read_only=True)
     theater_name = serializers.CharField(source='theater.name', read_only=True)
     total_seats = serializers.SerializerMethodField()
@@ -39,7 +49,12 @@ class ShowSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Show
-        fields = ['id','movie','movie_name','theater','theater_name','start_time','end_time','date','owner','total_seats','booked_seats','available_seats']
+        fields = [
+            'id', 'movie', 'movie_name', 'theater', 'theater_name',
+            'start_time', 'end_time', 'date', 'owner', 'owner_username',
+            'total_seats', 'booked_seats', 'available_seats'
+        ]
+        read_only_fields = ['owner']
 
     def get_total_seats(self, obj):
         return Seat.objects.filter(show=obj).count()
