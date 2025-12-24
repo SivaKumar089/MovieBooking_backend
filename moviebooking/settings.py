@@ -20,12 +20,7 @@ SECRET_KEY =os.getenv('PROJECT_SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True if os.getenv("DEBUG") == "True" else False
 
-ALLOWED_HOSTS = [
-    "127.0.0.1",
-    "localhost",
-    "moviebooking-backend-4cmk.onrender.com",
-    "bookit-web.netlify.app",
-]
+ALLOWED_HOSTS = ['*']
 
 
 INSTALLED_APPS = [
