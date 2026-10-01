@@ -36,56 +36,63 @@ class EmailOTPRequestView(APIView):
     def post(self, request):
         serializer = OTPRequestSerializer(data=request.data)
         if serializer.is_valid():
-            email = serializer.validated_data['email']
+            email = serializer.validated_data['email'].strip().lower()
 
-            if User.objects.filter(email=email).exists():
-                return Response({"error": "Email already registered."}, status=400)
+            if User.objects.filter(email__iexact=email).exists():
+                return Response({"error": "Email is already registered. Please log in."}, status=400)
 
             code = str(random.randint(100000, 999999))
+            EmailOTP.objects.filter(email__iexact=email, is_verified=False).delete()
+            EmailOTP.objects.create(email=email, code=code)
 
-            EmailOTP.objects.create(email=email,code=code)
+            try:
+                html_template = get_template("email_verify.html")
+                html_content = html_template.render({"email": email, "otp_code": code})
+            except Exception:
+                html_content = f"<p>Your email verification OTP code is <b>{code}</b>.</p>"
 
-            html_template = get_template("email_verify.html")
-            html_content = html_template.render({"email": email, "otp_code": code})
-
-            subject = "Your OTP Code"
-            from_email = settings.EMAIL_HOST_USER
+            subject = "SeatLock Email Verification Code"
+            from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', None) or settings.EMAIL_HOST_USER or 'noreply@seatlock.com'
             to_email = [email]
 
             email_message = EmailMultiAlternatives(
                 subject=subject,
-                body=f"Your OTP is: {code}",
+                body=f"Your SeatLock verification code is: {code}",
                 from_email=from_email,
                 to=to_email,
             )
+            if html_content:
+                email_message.attach_alternative(html_content, "text/html")
 
-            email_message.attach_alternative(html_content, "text/html")
-            email_message.send(fail_silently=False)
+            try:
+                email_message.send(fail_silently=False)
+                print(f"=== EMAIL OTP SENT TO {email}: {code} ===")
+                return Response({"message": f"Verification code sent to {email}"})
+            except Exception as mail_err:
+                print(f"Failed to send email verification OTP: {mail_err}")
+                print(f"=== FALLBACK OTP FOR {email}: {code} ===")
+                return Response({"error": f"Failed to deliver verification code: {str(mail_err)}"}, status=500)
 
-
-            return Response({"message": "OTP sent to email."})
-        return Response(serializer.errors, status=400)
+        first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Invalid data provided."
+        return Response({"error": first_error}, status=400)
 
 class EmailOTPVerifyView(APIView):
     def post(self, request):
         serializer = OTPVerifySerializer(data=request.data)
         if serializer.is_valid():
-            
-            code = serializer.validated_data['code']
+            email = serializer.validated_data['email'].strip().lower()
+            code = serializer.validated_data['code'].strip()
 
-            try:
-                
-                otp = EmailOTP.objects.filter( code=code, is_verified=False).last()
+            otp = EmailOTP.objects.filter(email__iexact=email, code=code, is_verified=False).last()
+            if not otp or otp.is_expired():
+                return Response({"error": "Invalid or expired verification code."}, status=400)
 
-                if not otp or otp.is_expired():
-                    return Response({"error": "Invalid or expired OTP"}, status=400)
+            otp.is_verified = True
+            otp.save()
+            return Response({"message": "Email verified successfully."})
 
-                otp.is_verified = True
-                otp.save()
-                return Response({"message": "OTP verified"})
-            except User.DoesNotExist:
-                return Response({"error": "User not found"}, status=404)
-        return Response(serializer.errors, status=400)
+        first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Invalid data provided."
+        return Response({"error": first_error}, status=400)
 
 
 class LoginView(APIView):
@@ -136,73 +143,123 @@ class OTPRequestView(APIView):
     def post(self, request):
         serializer = OTPRequestSerializer(data=request.data)
         if serializer.is_valid():
-            email = serializer.validated_data['email']
-            try:
-                user = User.objects.get(email=email)
-            except User.DoesNotExist:
-                return Response({"error": "User not found"}, status=404)
+            identifier = serializer.validated_data['email'].strip()
+            
+            # Lookup user by email or username (case-insensitive)
+            user = User.objects.filter(
+                Q(email__iexact=identifier) | Q(username__iexact=identifier)
+            ).first()
+
+            if not user:
+                return Response(
+                    {"error": f"No registered account found matching '{identifier}'. Please check your email or username."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Clean previous unverified codes for this user
+            OTP.objects.filter(user=user, is_verified=False).delete()
 
             code = str(random.randint(100000, 999999))
             OTP.objects.create(user=user, code=code)
 
-            html_template = get_template("otp_email.html")
-            html_content = html_template.render({'user': user, 'otp_code': code})
+            try:
+                html_template = get_template("otp_email.html")
+                html_content = html_template.render({'user': user, 'otp_code': code})
+            except Exception:
+                html_content = f"<p>Hello {user.username},</p><p>Your password reset OTP code is <b>{code}</b>. It is valid for 5 minutes.</p>"
 
-            subject = "Your OTP Code"
-            from_email = settings.EMAIL_HOST_USER
+            subject = "SeatLock Password Reset OTP Code"
+            from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', None) or settings.EMAIL_HOST_USER or 'noreply@seatlock.com'
             to_email = [user.email]
 
             email_message = EmailMultiAlternatives(
                 subject=subject,
-                body="Your OTP is: " + code,
+                body=f"Hello {user.username},\n\nYour SeatLock recovery OTP is: {code}\nThis code is valid for 5 minutes.",
                 from_email=from_email,
                 to=to_email,
             )
-            email_message.attach_alternative(html_content, "text/html")
-            email_message.send(fail_silently=False)
+            if html_content:
+                email_message.attach_alternative(html_content, "text/html")
 
-            return Response({"message": "OTP sent to email"})
-        return Response(serializer.errors, status=400)
+            email_sent = False
+            try:
+                email_message.send(fail_silently=False)
+                email_sent = True
+                print(f"=== OTP EMAIL SENT TO {user.email} (User: {user.username}): {code} ===")
+            except Exception as mail_err:
+                print(f"Failed to send recovery OTP email: {mail_err}")
+                print(f"=== FALLBACK OTP CODE FOR {user.email} ({user.username}): {code} ===")
+                return Response(
+                    {"error": f"Failed to deliver recovery email: {str(mail_err)}. Please verify email configuration or try again."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
+            # Mask email for safe user display (e.g. ku***@gmail.com)
+            parts = user.email.split("@")
+            masked_email = (parts[0][:2] + "***@" + parts[1]) if len(parts) == 2 and len(parts[0]) > 2 else user.email
+
+            return Response({
+                "message": f"Security OTP code dispatched to {masked_email}",
+                "email": user.email,
+                "username": user.username,
+            }, status=status.HTTP_200_OK)
+
+        first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Invalid data provided."
+        return Response({"error": first_error}, status=status.HTTP_400_BAD_REQUEST)
 
 class OTPVerifyView(APIView):
     def post(self, request):
         serializer = OTPVerifySerializer(data=request.data)
         if serializer.is_valid():
-            
-            code = serializer.validated_data['code']
+            identifier = serializer.validated_data['email'].strip()
+            code = serializer.validated_data['code'].strip()
 
-            try:
-                
-                otp = OTP.objects.filter( code=code, is_verified=False).last()
+            user = User.objects.filter(
+                Q(email__iexact=identifier) | Q(username__iexact=identifier)
+            ).first()
 
-                if not otp or otp.is_expired():
-                    return Response({"error": "Invalid or expired OTP"}, status=400)
+            if not user:
+                return Response({"error": "User account not found."}, status=status.HTTP_404_NOT_FOUND)
 
-                otp.is_verified = True
-                otp.save()
-                return Response({"message": "OTP verified"})
-            except User.DoesNotExist:
-                return Response({"error": "User not found"}, status=404)
-        return Response(serializer.errors, status=400)
+            otp = OTP.objects.filter(user=user, code=code, is_verified=False).last()
+
+            if not otp or otp.is_expired():
+                return Response({"error": "Invalid or expired verification code. Please request a new OTP."}, status=status.HTTP_400_BAD_REQUEST)
+
+            otp.is_verified = True
+            otp.save()
+            return Response({
+                "message": "Identity verified successfully.",
+                "email": user.email
+            }, status=status.HTTP_200_OK)
+
+        first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Invalid data provided."
+        return Response({"error": first_error}, status=status.HTTP_400_BAD_REQUEST)
     
 class ResetPasswordView(APIView):
     def post(self, request):
         serializer = PasswordResetSerializer(data=request.data)
         if serializer.is_valid():
-            email = serializer.validated_data['email']
+            identifier = serializer.validated_data['email'].strip()
             new_password = serializer.validated_data['new_password']
 
-            try:
-                user = User.objects.get(email=email)
-                otp = OTP.objects.filter(user=user, is_verified=True).last()
+            user = User.objects.filter(
+                Q(email__iexact=identifier) | Q(username__iexact=identifier)
+            ).first()
 
-                if not otp or otp.is_expired():
-                    return Response({"error": "OTP expired or not verified"}, status=400)
+            if not user:
+                return Response({"error": "User account not found."}, status=status.HTTP_404_NOT_FOUND)
 
-                user.password = make_password(new_password)
-                user.save()
-                otp.delete()
-                return Response({"message": "Password reset successful"})
-            except User.DoesNotExist:
-                return Response({"error": "User not found"}, status=404)
-        return Response(serializer.errors, status=400)
+            otp = OTP.objects.filter(user=user, is_verified=True).last()
+
+            if not otp or otp.is_expired():
+                return Response({"error": "Verification code expired or not verified. Please request a new OTP."}, status=status.HTTP_400_BAD_REQUEST)
+
+            user.password = make_password(new_password)
+            user.save()
+            OTP.objects.filter(user=user).delete()
+            return Response({"message": "Password reset successful! Sign in with your new password."}, status=status.HTTP_200_OK)
+
+        first_error = next(iter(serializer.errors.values()))[0] if serializer.errors else "Invalid data provided."
+        return Response({"error": first_error}, status=status.HTTP_400_BAD_REQUEST)
+

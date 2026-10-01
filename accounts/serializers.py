@@ -26,12 +26,12 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'role']
 
 class OTPRequestSerializer(serializers.Serializer):
-    email = serializers.EmailField()
+    email = serializers.CharField(max_length=255, required=True)
 
 class OTPVerifySerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    code = serializers.CharField(max_length=6)
+    email = serializers.CharField(max_length=255, required=True)
+    code = serializers.CharField(max_length=10, required=True)
 
 class PasswordResetSerializer(serializers.Serializer):
-    email = serializers.EmailField()
-    new_password = serializers.CharField()
+    email = serializers.CharField(max_length=255, required=True)
+    new_password = serializers.CharField(min_length=6, required=True)

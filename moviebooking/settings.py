@@ -52,6 +52,9 @@ EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() in ("true", "1")
 EMAIL_HOST_USER = os.getenv("HOST", "")
 EMAIL_HOST_PASSWORD = os.getenv("HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.getenv("HOST", "kumarsiva200426@gmail.com")
+SERVER_EMAIL = os.getenv("HOST", "kumarsiva200426@gmail.com")
+EMAIL_TIMEOUT = 10
 
 
 MIDDLEWARE = [
@@ -108,8 +111,16 @@ WSGI_APPLICATION = 'moviebooking.wsgi.application'
 from dotenv import load_dotenv
 load_dotenv()
 import os
+import sys
 
-if os.getenv('DB_NAME'):
+if 'test' in sys.argv:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+        }
+    }
+elif os.getenv('DB_NAME'):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',
