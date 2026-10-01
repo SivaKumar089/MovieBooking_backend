@@ -20,7 +20,8 @@ class MovieSerializer(serializers.ModelSerializer):
         model = Movie
         fields = [
             'id', 'title', 'description', 'duration_minutes', 'language',
-            'theater', 'release_date', 'owner', 'theater_name', 'owner_username'
+            'theater', 'release_date', 'owner', 'theater_name', 'owner_username',
+            'poster_url', 'banner_url', 'genre', 'rating', 'trailer_url'
         ]
         read_only_fields = ['owner']
 
@@ -30,7 +31,7 @@ class SeatSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Seat
-        fields = ['id', 'row', 'column', 'show', 'is_booked', 'booked_by']
+        fields = ['id', 'row', 'column', 'tier', 'show', 'is_booked', 'booked_by']
         read_only_fields = ['is_booked', 'show']
 
     def get_booked_by(self, obj):
@@ -43,6 +44,7 @@ class ShowSerializer(serializers.ModelSerializer):
     owner_username = serializers.CharField(source='owner.username', read_only=True)
     movie_name = serializers.CharField(source='movie.title', read_only=True)
     theater_name = serializers.CharField(source='theater.name', read_only=True)
+    price = serializers.DecimalField(source='standard_price', max_digits=8, decimal_places=2, read_only=True)
     total_seats = serializers.SerializerMethodField()
     available_seats = serializers.SerializerMethodField()
     booked_seats = serializers.SerializerMethodField()
@@ -52,6 +54,7 @@ class ShowSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'movie', 'movie_name', 'theater', 'theater_name',
             'start_time', 'end_time', 'date', 'owner', 'owner_username',
+            'vip_price', 'premium_price', 'standard_price', 'price',
             'total_seats', 'booked_seats', 'available_seats'
         ]
         read_only_fields = ['owner']

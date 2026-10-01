@@ -1,54 +1,50 @@
 from rest_framework import generics, permissions, status
-from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
-from .models import *
-from .serializers import *
-from .permissions import *
-from rest_framework_simplejwt.authentication import JWTAuthentication
+from .models import Theater, Movie, Show, Seat
+from .serializers import TheaterSerializer, MovieSerializer, ShowSerializer, SeatSerializer
+from .permissions import IsOwner, IsAdminOrOwnerCanEdit
+
+
+# ---------------- THEATER ---------------- #
 
 class TheaterListCreateView(generics.ListCreateAPIView):
     serializer_class = TheaterSerializer
-    permission_classes = [IsOwner]
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [permissions.IsAuthenticated(), IsOwner()]
+        return [permissions.AllowAny()]
 
     def get_queryset(self):
         user = self.request.user
-
-        if user.role in ['admin', 'user']:
-            return Theater.objects.all()
-
-        if user.role == 'owner':
+        if user.is_authenticated and getattr(user, 'role', '') == 'owner':
             return Theater.objects.filter(owner=user)
-
-        return Theater.objects.none()
+        return Theater.objects.all()
 
     def perform_create(self, serializer):
         user = self.request.user
-        print("Logged user:", user, user.role)
-
-        if user.role not in ['admin', 'owner']:
+        if getattr(user, 'role', '') not in ['admin', 'owner']:
             raise permissions.PermissionDenied("Only admin or owner can create theaters.")
-
         serializer.save(owner=user)
-
 
 
 # ---------------- MOVIE ---------------- #
 
 class MovieListCreateView(generics.ListCreateAPIView):
     serializer_class = MovieSerializer
-    permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [permissions.IsAuthenticated()]
+        return [permissions.AllowAny()]
 
     def get_queryset(self):
         user = self.request.user
-        
-        if user.role in ['admin', 'user']:
-            queryset = Movie.objects.all()
-        elif user.role == 'owner':
+        if user.is_authenticated and getattr(user, 'role', '') == 'owner':
             queryset = Movie.objects.filter(owner=user)
         else:
-            return Movie.objects.none()
+            queryset = Movie.objects.all()
 
-        # Filter by theater if provided
         theater = self.request.query_params.get("theater")
         if theater:
             queryset = queryset.filter(theater_id=theater)
@@ -57,7 +53,7 @@ class MovieListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role in ['admin', 'owner']:
+        if getattr(user, 'role', '') in ['admin', 'owner']:
             serializer.save(owner=user)
         else:
             raise permissions.PermissionDenied("Only admin/owner can create movies.")
@@ -66,7 +62,11 @@ class MovieListCreateView(generics.ListCreateAPIView):
 class MovieRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Movie.objects.all()
     serializer_class = MovieSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAdminOrOwnerCanEdit]
+
+    def get_permissions(self):
+        if self.request.method in ['PUT', 'PATCH', 'DELETE']:
+            return [permissions.IsAuthenticated(), IsAdminOrOwnerCanEdit()]
+        return [permissions.AllowAny()]
 
 
 # ---------------- SHOW ---------------- #
@@ -77,14 +77,14 @@ class ShowListCreateView(generics.ListCreateAPIView):
     def get_permissions(self):
         if self.request.method == 'POST':
             return [permissions.IsAuthenticated(), IsOwner()]
-        return [permissions.IsAuthenticated()]
+        return [permissions.AllowAny()]
 
     def get_queryset(self):
         queryset = Show.objects.all().select_related('movie', 'theater')
         user = self.request.user
         movie_id = self.request.query_params.get('movie')
 
-        if user.role == 'owner':
+        if user.is_authenticated and getattr(user, 'role', '') == 'owner':
             queryset = queryset.filter(owner=user)
 
         if movie_id:
@@ -99,20 +99,28 @@ class ShowListCreateView(generics.ListCreateAPIView):
 class ShowRetrieveUpdateDestroyView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Show.objects.all().select_related('movie', 'theater')
     serializer_class = ShowSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAdminOrOwnerCanEdit]
+
+    def get_permissions(self):
+        if self.request.method in ['PUT', 'PATCH', 'DELETE']:
+            return [permissions.IsAuthenticated(), IsAdminOrOwnerCanEdit()]
+        return [permissions.AllowAny()]
 
 
 # ---------------- SEAT ---------------- #
 
 class SeatListCreateView(generics.ListCreateAPIView):
     serializer_class = SeatSerializer
-    permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [permissions.IsAuthenticated()]
+        return [permissions.AllowAny()]
 
     def get_queryset(self):
         return Seat.objects.filter(show_id=self.kwargs['show_id']).order_by('row', 'column')
 
     def perform_create(self, serializer):
         user = self.request.user
-        if user.role != 'owner':
+        if getattr(user, 'role', '') != 'owner':
             raise permissions.PermissionDenied("Only owners can create seats.")
         serializer.save(show_id=self.kwargs['show_id'])
