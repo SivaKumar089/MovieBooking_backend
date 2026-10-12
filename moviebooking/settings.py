@@ -113,14 +113,7 @@ load_dotenv()
 import os
 import sys
 
-if 'test' in sys.argv:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': ':memory:',
-        }
-    }
-elif os.getenv('DB_NAME'):
+if os.getenv('DB_NAME'):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.mysql',

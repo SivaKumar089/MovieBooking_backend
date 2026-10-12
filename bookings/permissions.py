@@ -13,7 +13,7 @@ from rest_framework.permissions import BasePermission
 
 class IsUser(BasePermission):
     def has_permission(self, request, view):
-        return request.user.role == 'user'
+        return bool(request.user and request.user.is_authenticated)
 
 class IsOwner(BasePermission):
     def has_permission(self, request, view):

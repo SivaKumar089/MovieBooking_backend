@@ -10,4 +10,6 @@ urlpatterns = [
     path('bookings/admin/', AdminBookingListView.as_view(), name='admin-bookings'),
     path('bookings/owner/', OwnerBookingListView.as_view(), name='owner-bookings'),
     path('bookings/<int:pk>/update/',BookingUpdateView.as_view(), name='update-booking'),
+    path('bookings/clear-test-data/', ClearTestDataView.as_view(), name='clear-test-data'),
+    path('bookings/verify/', VerifyTicketView.as_view(), name='verify-ticket'),
 ]

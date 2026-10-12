@@ -10,18 +10,17 @@ class SeatSerializer(serializers.ModelSerializer):
 
 
 class CreateBookingSerializer(serializers.Serializer):
-    show_id = serializers.IntegerField()
+    show_id = serializers.IntegerField(required=False)
     seat_ids = serializers.ListField(
-        child=serializers.IntegerField(),
         required=False,
         default=list
     )
     # Backward compatibility with single-seat request
     movie_id = serializers.IntegerField(required=False)
     theater_id = serializers.IntegerField(required=False)
-    row = serializers.CharField(max_length=1, required=False)
+    row = serializers.CharField(max_length=10, required=False)
     column = serializers.IntegerField(required=False)
-    payment_id = serializers.CharField(max_length=100, required=False, default="")
+    payment_id = serializers.CharField(max_length=200, required=False, default="")
 
 
 class BookingSerializer(serializers.ModelSerializer):
@@ -39,9 +38,10 @@ class BookingSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'user', 'user_name', 'movie_name', 'movie_poster',
             'theater_name', 'theater_location', 'show', 'show_date', 'show_start_time',
-            'seat', 'booking_code', 'seat_price', 'created_at', 'is_cancelled'
+            'seat', 'booking_code', 'seat_price', 'created_at', 'is_cancelled',
+            'is_used', 'used_at'
         ]
-        read_only_fields = ['user', 'is_cancelled', 'booking_code', 'seat_price', 'created_at']
+        read_only_fields = ['user', 'is_cancelled', 'is_used', 'used_at', 'booking_code', 'seat_price', 'created_at']
 
 
 class OrderSerializer(serializers.ModelSerializer):

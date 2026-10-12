@@ -31,7 +31,8 @@ class Booking(models.Model):
     seat_price = models.DecimalField(max_digits=8, decimal_places=2, default=120.00)
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     is_cancelled = models.BooleanField(default=False)
-
+    is_used = models.BooleanField(default=False)
+    used_at = models.DateTimeField(null=True, blank=True)
     def __str__(self):
         return f"{self.booking_code or 'NO-CODE'} - {self.seat.row}{self.seat.column} ({self.user.username})"
 
