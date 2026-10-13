@@ -28,16 +28,44 @@ class MovieSerializer(serializers.ModelSerializer):
 
 class SeatSerializer(serializers.ModelSerializer):
     booked_by = serializers.SerializerMethodField()
+    booked_by_id = serializers.SerializerMethodField()
+    is_mine = serializers.SerializerMethodField()
+    is_booked = serializers.SerializerMethodField()
+    booking_code = serializers.SerializerMethodField()
 
     class Meta:
         model = Seat
-        fields = ['id', 'row', 'column', 'tier', 'show', 'is_booked', 'booked_by']
+        fields = ['id', 'row', 'column', 'tier', 'show', 'is_booked', 'booked_by', 'booked_by_id', 'is_mine', 'booking_code']
         read_only_fields = ['is_booked', 'show']
 
+    def _get_active_booking(self, obj):
+        if not hasattr(obj, '_cached_active_booking'):
+            from bookings.models import Booking
+            obj._cached_active_booking = Booking.objects.filter(seat=obj, is_cancelled=False).select_related('user').first()
+        return obj._cached_active_booking
+
+    def get_is_booked(self, obj):
+        b = self._get_active_booking(obj)
+        return bool(obj.is_booked or b)
+
     def get_booked_by(self, obj):
-        from bookings.models import Booking
-        booking = Booking.objects.filter(seat=obj).first()
-        return booking.user.username if booking else None
+        b = self._get_active_booking(obj)
+        return b.user.username if b else None
+
+    def get_booked_by_id(self, obj):
+        b = self._get_active_booking(obj)
+        return b.user_id if b else None
+
+    def get_booking_code(self, obj):
+        b = self._get_active_booking(obj)
+        return b.booking_code if b else None
+
+    def get_is_mine(self, obj):
+        request = self.context.get('request')
+        if not request or not getattr(request, 'user', None) or not request.user.is_authenticated:
+            return False
+        b = self._get_active_booking(obj)
+        return bool(b and b.user_id == request.user.id)
 
 
 class ShowSerializer(serializers.ModelSerializer):
@@ -63,7 +91,12 @@ class ShowSerializer(serializers.ModelSerializer):
         return Seat.objects.filter(show=obj).count()
 
     def get_booked_seats(self, obj):
-        return Seat.objects.filter(show=obj, is_booked=True).count()
+        from django.db.models import Q
+        from bookings.models import Booking
+        active_seat_ids = Booking.objects.filter(show=obj, is_cancelled=False).values_list('seat_id', flat=True)
+        return Seat.objects.filter(show=obj).filter(Q(is_booked=True) | Q(id__in=active_seat_ids)).distinct().count()
 
     def get_available_seats(self, obj):
-        return Seat.objects.filter(show=obj, is_booked=False).count()
+        total = self.get_total_seats(obj)
+        booked = self.get_booked_seats(obj)
+        return max(0, total - booked)

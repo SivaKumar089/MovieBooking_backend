@@ -109,6 +109,8 @@ class LoginView(APIView):
 
             if check_password(password, user.password):
                 refresh = RefreshToken.for_user(user)
+                refresh['username'] = user.username
+                refresh['role'] = user.role
                 return Response({
                     'access': str(refresh.access_token),
                     'refresh': str(refresh),

@@ -1,14 +1,14 @@
 import uuid
 from decimal import Decimal
 from django.db import transaction
-from rest_framework import generics, status
+from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from .models import Booking, Order, Seat, Show, Theater
 from .serializers import *
-from .permissions import IsUser, IsOwner, IsAdmin, IsBookingOwner
+from .permissions import IsUser, IsOwner, IsAdmin, IsBookingOwner, IsAdminOrOwner
 
 User = get_user_model()
 
@@ -22,7 +22,7 @@ def calculate_seat_price(seat, show):
 
 
 class BookingCreateView(APIView):
-    permission_classes = []
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         serializer = CreateBookingSerializer(data=request.data)
@@ -34,15 +34,11 @@ class BookingCreateView(APIView):
         if not show:
             show = Show.objects.first()
             if not show:
-                return Response({"error": "No available shows found."}, status=400)
+                return Response({"error": "No available shows found."}, status=status.HTTP_400_BAD_REQUEST)
 
         seat_ids = data.get('seat_ids', [])
 
-        # Assign user: authenticated user or fallback demo user
-        if request.user and request.user.is_authenticated:
-            booking_user = request.user
-        else:
-            booking_user = User.objects.filter(role='user').first() or User.objects.first()
+        booking_user = request.user
 
         with transaction.atomic():
             seats = []
@@ -50,7 +46,7 @@ class BookingCreateView(APIView):
                 int_ids = []
                 str_labels = []
                 for sid in seat_ids:
-                    if isinstance(sid, int) or (isinstance(sid, str) and sid.isdigit()):
+                    if isinstance(sid, int) or (isinstance(sid, str) and str(sid).isdigit()):
                         int_ids.append(int(sid))
                     else:
                         str_labels.append(str(sid))
@@ -76,20 +72,21 @@ class BookingCreateView(APIView):
                     if s:
                         seats = [s]
 
-            # If still no seats, pick the first available seats for this show
             if not seats:
-                needed = len(seat_ids) if seat_ids else 2
-                seats = list(Seat.objects.select_for_update().filter(show=show, is_booked=False)[:needed])
-                if not seats:
-                    # Reset seats for this show so demo bookings always succeed
-                    Seat.objects.filter(show=show).update(is_booked=False)
-                    seats = list(Seat.objects.select_for_update().filter(show=show)[:needed])
+                return Response({"error": "No valid seats selected for booking."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # In dummy / demo simulation: if any requested seat was already marked booked, free it
+            # Prevent double booking: verify none of the selected seats are already booked
+            already_booked = []
             for s in seats:
-                if s.is_booked:
-                    s.is_booked = False
-                    s.save()
+                has_active = Booking.objects.filter(seat=s, is_cancelled=False).exists()
+                if s.is_booked or has_active:
+                    already_booked.append(f"{s.row}{s.column}")
+
+            if already_booked:
+                return Response({
+                    "error": f"Seat(s) already booked: {', '.join(already_booked)}. Please select available seats.",
+                    "booked_seats": already_booked
+                }, status=status.HTTP_400_BAD_REQUEST)
 
             # Generate unique order & booking identifiers
             booking_code = f"BK-{uuid.uuid4().hex[:8].upper()}"
@@ -110,7 +107,7 @@ class BookingCreateView(APIView):
             bookings = []
             for seat in seats:
                 seat.is_booked = True
-                seat.save()
+                seat.save(update_fields=['is_booked'])
                 price = calculate_seat_price(seat, show)
                 b = Booking.objects.create(
                     user=booking_user,
@@ -136,30 +133,20 @@ class SeatUpdateAPIView(generics.UpdateAPIView):
                 
 class MyTicketsView(generics.ListAPIView):
     serializer_class = BookingSerializer
-    permission_classes = []
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        if self.request.user and self.request.user.is_authenticated:
-            return Booking.objects.filter(user=self.request.user, is_cancelled=False).order_by('-id')
-        demo_user = User.objects.filter(role='user').first() or User.objects.first()
-        if demo_user:
-            return Booking.objects.filter(user=demo_user, is_cancelled=False).order_by('-id')
-        return Booking.objects.filter(is_cancelled=False).order_by('-id')
+        return Booking.objects.filter(user=self.request.user, is_cancelled=False).order_by('-id')
 
 class MyOrdersView(generics.ListAPIView):
     serializer_class = OrderSerializer
-    permission_classes = []
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        if self.request.user and self.request.user.is_authenticated:
-            return Order.objects.filter(user=self.request.user).order_by('-created_at')
-        demo_user = User.objects.filter(role='user').first() or User.objects.first()
-        if demo_user:
-            return Order.objects.filter(user=demo_user).order_by('-created_at')
-        return Order.objects.all().order_by('-created_at')
+        return Order.objects.filter(user=self.request.user).order_by('-created_at')
     
 class BookingCancelView(APIView):
-    permission_classes = []
+    permission_classes = [permissions.IsAuthenticated]
 
     def patch(self, request, pk):
         return self._cancel(request, pk)
@@ -172,17 +159,21 @@ class BookingCancelView(APIView):
 
     def _cancel(self, request, pk):
         booking = get_object_or_404(Booking, id=pk)
+        if request.user.role not in ['admin', 'owner'] and booking.user != request.user:
+            return Response({"error": "You do not have permission to cancel this booking."}, status=status.HTTP_403_FORBIDDEN)
+
         booking.is_cancelled = True
-        booking.save()
+        booking.save(update_fields=['is_cancelled'])
         if booking.seat:
-            booking.seat.is_booked = False
-            booking.seat.save()
+            has_other_active = Booking.objects.filter(seat=booking.seat, is_cancelled=False).exclude(id=booking.id).exists()
+            booking.seat.is_booked = has_other_active
+            booking.seat.save(update_fields=['is_booked'])
 
         if booking.order:
             active_count = booking.order.bookings.filter(is_cancelled=False).count()
             if active_count == 0:
                 booking.order.status = 'CANCELLED'
-                booking.order.save()
+                booking.order.save(update_fields=['status'])
 
         return Response({"message": "Booking cancelled successfully. Seat has been freed."}, status=status.HTTP_200_OK)
 
@@ -215,22 +206,21 @@ class BookingUpdateView(APIView):
 
 
 class ClearTestDataView(APIView):
-    permission_classes = []
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        if request.user and request.user.is_authenticated:
-            user_bookings = Booking.objects.filter(user=request.user)
-            user_orders = Order.objects.filter(user=request.user)
-        else:
-            demo_user = User.objects.filter(role='user').first() or User.objects.first()
-            user_bookings = Booking.objects.filter(user=demo_user) if demo_user else Booking.objects.all()
-            user_orders = Order.objects.filter(user=demo_user) if demo_user else Order.objects.all()
+        user_bookings = Booking.objects.filter(user=request.user)
+        user_orders = Order.objects.filter(user=request.user)
 
         seat_ids = list(user_bookings.values_list('seat_id', flat=True))
-        Seat.objects.filter(id__in=seat_ids).update(is_booked=False)
-        count = user_bookings.count()
         user_bookings.delete()
         user_orders.delete()
+        # Only set seat.is_booked to False if no other active booking exists
+        for sid in seat_ids:
+            has_active = Booking.objects.filter(seat_id=sid, is_cancelled=False).exists()
+            Seat.objects.filter(id=sid).update(is_booked=has_active)
+
+        count = len(seat_ids)
         return Response({
             "message": f"Successfully cleared {count} test booking(s) and freed reserved seats.",
             "cleared_count": count
@@ -240,16 +230,9 @@ class ClearTestDataView(APIView):
 class VerifyTicketView(APIView):
     """
     Validates a ticket's QR code or identifier against the booking database.
-    Privacy policy compliant: Returns ONLY the ticket ID and the associated ID name.
-    Handles:
-    - VALID: ticket exists, active, not used, show is current
-    - ALREADY_USED: ticket was already admitted
-    - CANCELLED: booking was cancelled
-    - EXPIRED: show date has already passed
-    - INVALID: not found in database or corrupted payload
-    Supports action='admit' to confirm admission in the database.
+    Restricted to authorized owner and admin roles only.
     """
-    permission_classes = []
+    permission_classes = [permissions.IsAuthenticated, IsAdminOrOwner]
 
     def post(self, request):
         import json

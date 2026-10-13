@@ -114,3 +114,90 @@ class BookingEngineTests(TestCase):
         self.assertFalse(seat_d1.is_booked)
         booking = Booking.objects.get(id=booking_id)
         self.assertTrue(booking.is_cancelled)
+
+    def test_owner_can_book_seats_normally(self):
+        # Authenticate as owner
+        self.client.force_authenticate(user=self.owner)
+        seat_a2 = Seat.objects.get(show=self.show, row='A', column=2)
+
+        response = self.client.post('/bookings/', {
+            'show_id': self.show.id,
+            'seat_ids': [seat_a2.id]
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['bookings'][0]['user'], self.owner.id)
+
+        seat_a2.refresh_from_db()
+        self.assertTrue(seat_a2.is_booked)
+
+        # Owner should see this booking in my-tickets
+        my_tickets_res = self.client.get('/my-tickets/')
+        self.assertEqual(my_tickets_res.status_code, status.HTTP_200_OK)
+        ticket_ids = [t['seat']['id'] for t in my_tickets_res.data]
+        self.assertIn(seat_a2.id, ticket_ids)
+
+    def test_seat_counts_synchronization(self):
+        # Initially 100 total, 100 available, 0 booked
+        show_res = self.client.get(f'/shows/{self.show.id}/')
+        self.assertEqual(show_res.data['total_seats'], 100)
+        self.assertEqual(show_res.data['available_seats'], 100)
+        self.assertEqual(show_res.data['booked_seats'], 0)
+
+        # Book 1 seat (Row A - Seat 1)
+        seat_a1 = Seat.objects.get(show=self.show, row='A', column=1)
+        book_res = self.client.post('/bookings/', {
+            'show_id': self.show.id,
+            'seat_ids': [seat_a1.id]
+        }, format='json')
+        self.assertEqual(book_res.status_code, status.HTTP_201_CREATED)
+
+        # Check show counts: available must reduce by exactly 1, booked increase by 1
+        show_res = self.client.get(f'/shows/{self.show.id}/')
+        self.assertEqual(show_res.data['total_seats'], 100)
+        self.assertEqual(show_res.data['available_seats'], 99)
+        self.assertEqual(show_res.data['booked_seats'], 1)
+
+        # Cancel the booking
+        booking_id = book_res.data['bookings'][0]['id']
+        cancel_res = self.client.patch(f'/bookings/{booking_id}/cancel/')
+        self.assertEqual(cancel_res.status_code, status.HTTP_200_OK)
+
+        # Availability must be restored
+        show_res = self.client.get(f'/shows/{self.show.id}/')
+        self.assertEqual(show_res.data['total_seats'], 100)
+        self.assertEqual(show_res.data['available_seats'], 100)
+        self.assertEqual(show_res.data['booked_seats'], 0)
+
+    def test_gatebox_scanner_permissions(self):
+        # User Alice tries to access verification API -> 403 Forbidden
+        self.client.force_authenticate(user=self.user)
+        res = self.client.post('/bookings/verify/', {'ticket_id': '1'}, format='json')
+        self.assertEqual(res.status_code, status.HTTP_403_FORBIDDEN)
+
+        # Owner Mike accesses verification API -> Allowed
+        self.client.force_authenticate(user=self.owner)
+        res_owner = self.client.post('/bookings/verify/', {'ticket_id': '1'}, format='json')
+        self.assertNotEqual(res_owner.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_seat_serializer_is_mine_logic(self):
+        # Alice books Seat A3
+        self.client.force_authenticate(user=self.user)
+        seat_a3 = Seat.objects.get(show=self.show, row='A', column=3)
+        self.client.post('/bookings/', {
+            'show_id': self.show.id,
+            'seat_ids': [seat_a3.id]
+        }, format='json')
+
+        # Alice views seats
+        alice_seats_res = self.client.get(f'/shows/{self.show.id}/seats/')
+        alice_seat_a3 = next(s for s in alice_seats_res.data if s['id'] == seat_a3.id)
+        self.assertTrue(alice_seat_a3['is_booked'])
+        self.assertTrue(alice_seat_a3['is_mine'])
+
+        # Owner views seats
+        self.client.force_authenticate(user=self.owner)
+        owner_seats_res = self.client.get(f'/shows/{self.show.id}/seats/')
+        owner_seat_a3 = next(s for s in owner_seats_res.data if s['id'] == seat_a3.id)
+        self.assertTrue(owner_seat_a3['is_booked'])
+        self.assertFalse(owner_seat_a3['is_mine'])

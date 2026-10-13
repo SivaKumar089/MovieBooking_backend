@@ -1,127 +1,208 @@
-# 🎬 MovieBooking Backend
+# 🎬 Bookit Cinema — Backend REST API Engine
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/Django-5.x-092E20?logo=django&logoColor=white" />
-  <img src="https://img.shields.io/badge/DRF-REST%20API-EF4444?logo=django&logoColor=white" />
-  <img src="https://img.shields.io/badge/PostgreSQL-Database-316192?logo=postgresql&logoColor=white" />
-  <img src="https://img.shields.io/badge/JWT-Auth-000000?logo=jsonwebtokens&logoColor=white" />
-  <img src="https://img.shields.io/badge/Render-Deploy-46E3B7?logo=render&logoColor=111" />
+  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/Django-5.x-092E20?style=for-the-badge&logo=django&logoColor=white" />
+  <img src="https://img.shields.io/badge/Django_REST_Framework-API-EF4444?style=for-the-badge&logo=django&logoColor=white" />
+  <img src="https://img.shields.io/badge/JWT-SimpleJWT_Auth-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white" />
+  <img src="https://img.shields.io/badge/Database-MySQL_%2F_SQLite-4479A1?style=for-the-badge&logo=mysql&logoColor=white" />
+  <img src="https://img.shields.io/badge/Tests-8%20Passed-10B981?style=for-the-badge&logo=pytest&logoColor=white" />
 </p>
 
-> **A production-ready backend for a Movie Ticket Booking system** built with **Django + Django REST Framework**. Supports role-based access (admin/owner/user), shows with auto-generated seats (10×10), secure JWT auth, and clean, scalable APIs for movies, theaters, shows, seats, and bookings.
+> **A high-concurrency, transaction-safe backend for Movie Ticket Booking and Theater Auditorium Management**, engineered with **Django 5** and **Django REST Framework (DRF)**. Features atomic seat reservation, dynamic multi-tier seating grids, role-based access control (Admin, Theater Owner, Customer), and Gatebox QR ticket verification.
 
 ---
 
-## ✨ Features
+## 📑 Table of Contents
 
-* 🔐 **JWT Authentication** (access + refresh) with optional **OTP-based password reset**
-* 👑 **Roles**: `admin`, `owner` (can manage theaters & shows), `user`
-* 🎭 **Movie & Theater Management**
-* 🗓️ **Shows** with **auto seat grid generation** (e.g., 10×10 = 100 seats) on creation
-* 🎟️ **Seat selection & booking** flow (atomic, avoids double booking)
-* 🚦 **Status-aware seats**: available / selected / booked
-* 📦 Clean project structure, environment-based settings, and ready for **Render** deploy
-
----
-
-## 🛠️ Tech Stack
-
-<p align="left">
-  <img src="https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/Django-5.x-092E20?logo=django&logoColor=white" />
-  <img src="https://img.shields.io/badge/Django%20REST%20Framework-API-EF4444?logo=django&logoColor=white" />
-  <img src="https://img.shields.io/badge/PostgreSQL-DB-316192?logo=postgresql&logoColor=white" />
-  <img src="https://img.shields.io/badge/SimpleJWT-Tokens-000000?logo=jsonwebtokens&logoColor=white" />
-  <img src="https://img.shields.io/badge/Whitenoise-Static-555555" />
-  <img src="https://img.shields.io/badge/Gunicorn-WSGI-2CA5E0?logo=gunicorn&logoColor=white" />
-  <img src="https://img.shields.io/badge/Render-Hosting-46E3B7?logo=render&logoColor=111" />
-</p>
+- [Key Features](#-key-features)
+- [System Architecture](#-system-architecture)
+- [Role-Based Access Control (RBAC)](#-role-based-access-control-rbac)
+- [Atomic Seat Booking Engine](#-atomic-seat-booking-engine)
+- [API Reference](#-api-reference)
+- [Local Development Setup](#-local-development-setup)
+- [Automated Testing](#-automated-testing)
+- [Database Configuration](#-database-configuration)
+- [Production Deployment](#-production-deployment)
 
 ---
 
-## 🧱 Architecture
+## 🚀 Key Features
+
+* 🔐 **Secure JWT Authentication:** Access & Refresh tokens powered by SimpleJWT with user identity claims and email-based OTP password recovery.
+* 🛡️ **Role-Based Access Control:** Strict permission segregation across `admin`, `owner`, and `user` roles without hindering legitimate owner bookings.
+* 🎟️ **Atomic Double-Booking Prevention:** Utilizes `transaction.atomic()` and `select_for_update()` to eliminate race conditions during high-demand seat bookings.
+* 💺 **Dynamic Seating Grid:** Automatic generation of 100 seats (Rows A–J × 10 Columns) with three tiers (`VIP`, `PREMIUM`, `STANDARD`) and tier-based pricing.
+* 🔄 **Real-Time Seat State Tracking:** Seats provide dynamic contextual attributes: `is_booked`, `is_mine`, `booked_by`, and `booking_code`.
+* 📊 **Live Show Metrics:** Instant recalculation of `total_seats`, `booked_seats`, and `available_seats` with strict `-1` decrement upon confirmed booking and restoration upon cancellation.
+* 📱 **Gatebox QR Verification API:** Cryptographically verifiable ticket pass validation endpoint restricted to owners and administrators.
+
+---
+
+## 🧱 System Architecture
 
 ```
-Client (React / React Native)
-        │   JSON over HTTPS (JWT)
-        ▼
-   Django REST Framework
-        ├─ apps: users, theaters, movies, shows, bookings
-        ├─ auth: JWT + (optional) OTP reset
-        ▼
-      PostgreSQL
+                  ┌───────────────────────────────┐
+                  │    React Client (Vite/Tailwind) │
+                  └───────────────┬───────────────┘
+                                  │ HTTP / JSON (Bearer JWT)
+                                  ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Django REST Framework API                     │
+│                                                                 │
+│   ┌───────────────────┐  ┌───────────────────┐  ┌─────────────┐ │
+│   │   accounts App    │  │   theaters App    │  │bookings App │ │
+│   │  - Auth & Profile │  │  - Theaters/Shows │  │- Transaction│ │
+│   │  - SimpleJWT / OTP│  │  - Seats & Tiers  │  │- QR Verify  │ │
+│   └───────────────────┘  └───────────────────┘  └─────────────┘ │
+│                                                                 │
+│             Middleware & Custom Permission Guards                │
+│             (IsAuthenticated, IsAdminOrOwner)                   │
+└───────────────────────────────┬─────────────────────────────────┘
+                                │ ORM (Transactions & Row Locks)
+                                ▼
+         ┌──────────────────────────────────────────────┐
+         │         Database Engine (ACID Compliant)     │
+         │  - Runtime: Clever Cloud MySQL               │
+         │  - Testing: In-Memory SQLite (:memory:)      │
+         └──────────────────────────────────────────────┘
 ```
+
+---
+
+## 👥 Role-Based Access Control (RBAC)
+
+| Role | Browse & Book Tickets | Manage Theaters & Shows | Owner Status & Map | Gatebox QR Scanner | Full Admin Panel |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **User (Customer)** | ✅ Yes | ❌ No | ❌ No | ❌ Denied (403) | ❌ No |
+| **Owner** | ✅ Yes | ✅ Yes (Own items) | ✅ Yes | ✅ Allowed | ❌ No |
+| **Admin** | ✅ Yes | ✅ Yes (All items) | ✅ Yes | ✅ Allowed | ✅ Full Access |
+
+---
+
+## ⚡ Atomic Seat Booking Engine
+
+To prevent race conditions and overbooking when multiple users attempt to reserve the same seat simultaneously:
+
+1. **Transaction Wrapping:** The booking process runs inside `transaction.atomic()`.
+2. **Pessimistic Locking:** Targeted seat records are queried with `select_for_update()`.
+3. **Availability Validation:** If any selected seat is already marked `is_booked=True` or has an active uncancelled booking, the entire transaction aborts immediately with HTTP 400 (`Seat(s) already booked`).
+4. **Immediate Status Lock:** The seats are marked `is_booked=True`, an `Order` and corresponding `Booking` records are generated, and a unique `booking_code` (e.g., `BK-XXXXXXXX`) is assigned.
+5. **Auto-Restoration:** If a booking is cancelled via `PATCH /bookings/<id>/cancel/`, the associated seat is freed (`is_booked=False`), and available seat counts are incremented automatically.
+
+---
+
+## 📡 API Reference
+
+### 1. Authentication (`accounts/`)
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/login/` | Authenticate user, return JWT tokens & profile | No |
+| `POST` | `/signup/` | Register new account (`user` or `owner`) | No |
+| `GET` | `/profile/` | Fetch current user's profile details | Yes |
+| `POST` | `/token/refresh/` | Obtain fresh access token | No |
+| `POST` | `/otp/request/` | Generate email verification OTP | No |
+| `POST` | `/otp/verify/` | Verify OTP for password reset | No |
+
+### 2. Shows & Seats (`theaters/`)
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/shows/` | List all active shows with live seat counts | Optional |
+| `GET` | `/shows/?managed=true` | Shows filtered for the authenticated owner | Owner / Admin |
+| `GET` | `/shows/<id>/` | Detailed show information | Optional |
+| `GET` | `/shows/<id>/seats/` | Full 100-seat layout with `is_mine`, `is_booked`, tier | Optional |
+| `POST` | `/shows/` | Create a new screening (auto-generates 100 seats) | Owner / Admin |
+
+### 3. Bookings & Verification (`bookings/`)
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/bookings/` | Create atomic booking for selected seat IDs | Yes |
+| `GET` | `/my-tickets/` | Retrieve authenticated user's confirmed tickets | Yes |
+| `PATCH`| `/bookings/<id>/cancel/` | Cancel confirmed ticket and free seat | Yes (Owner/Self) |
+| `POST` | `/bookings/verify/` | Verify ticket QR pass against database | **Owner / Admin Only** |
+| `POST` | `/bookings/clear-test-data/` | Clear sandbox test reservations | Yes |
+
+---
+
+## 💻 Local Development Setup
+
+### Prerequisites
+* **Python 3.11+** installed
+* **MySQL** or **SQLite**
+* **Git**
+
+### Step-by-Step Installation
 
 ```bash
-# install packages
+# 1. Clone repository & navigate to backend directory
+cd MovieBooking_backend
+
+# 2. Activate virtual environment
+# Windows:
+.\env\Scripts\activate
+# Linux / macOS:
+source env/bin/activate
+
+# 3. Install required dependencies
 pip install -r requirements.txt
+
+# 4. Configure environment variables (.env)
+# Create a .env file with your database credentials:
+# DB_NAME=your_db_name
+# DB_USER=your_db_user
+# DB_PASSWORD=your_db_password
+# DB_HOST=your_db_host
+# DB_PORT=3306
+
+# 5. Apply migrations
+python manage.py migrate
+
+# 6. Run development server
+python manage.py runserver 127.0.0.1:8000
 ```
 
+The backend API will be available at `http://127.0.0.1:8000/`.
 
-### 4) Run Migrations & Server
+---
+
+## 🧪 Automated Testing
+
+The backend includes a comprehensive unit test suite covering the entire booking lifecycle:
 
 ```bash
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py runserver
+python manage.py test
 ```
 
+### Test Suite Coverage:
+1. `test_seats_auto_generated_with_tiers`: Validates 100-seat matrix (20 VIP, 40 Premium, 40 Standard).
+2. `test_atomic_multi_seat_booking_success`: Ensures atomic checkout, price tallying, and database locks.
+3. `test_prevent_double_booking_conflict`: Verifies duplicate booking prevention and 400 error response.
+4. `test_cancellation_releases_seat`: Confirms cancellation releases seat back to available status.
+5. `test_owner_can_book_seats_normally`: Asserts owners can book tickets and view them in "My Tickets".
+6. `test_seat_counts_synchronization`: Validates exact `-1` decrement and post-cancellation restoration.
+7. `test_gatebox_scanner_permissions`: Confirms 403 Forbidden for regular users and access for owners/admins.
+8. `test_seat_serializer_is_mine_logic`: Ensures accurate ownership identification per authenticated user.
+
+*All 8 tests execute in an isolated in-memory SQLite database (`:memory:`) in ~12 seconds.*
+
 ---
 
-## ☁️ Deploy to Render
+## ☁️ Production Deployment
 
-### A) Prepare the codebase
-
-1. **Add production deps** in `requirements.txt` (already shown above). Ensure `dj-database-url` is added if you use it:
-
-   ```
-   dj-database-url
-   ```
-2. **Procfile** (Gunicorn entrypoint). Replace `core` with your Django project name:
-
-   ```
-   web: gunicorn core.wsgi:application --preload
-   ```
-3. **Static files**: ensure `whitenoise` middleware present and `collectstatic` runs.
-4. **Settings**: set `ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS` for Render domain.
-
-   ```python
-   CSRF_TRUSTED_ORIGINS = [
-       "https://*.onrender.com",
-       "https://your-custom-domain.com",
-   ]
-   ```
-
-### B) Create services on Render
-
-1. **Push code to GitHub**.
-
-2. In **Render Dashboard** → **New +** → **Web Service** → **Build from GitHub** → select your repo.
-
-3. **Environment**: `Python 3`
-
-4. **Region**: closest to your users.
-
-5. **Build Command**:
-
+### Production Checklist
+1. Set `DEBUG=False` in environment settings.
+2. Ensure `ALLOWED_HOSTS` contains your production domain.
+3. Serve static files with **WhiteNoise** or an S3 bucket:
    ```bash
-   pip install -r requirements.txt 
+   python manage.py collectstatic --noinput
    ```
-
-6. **Start Command** (matches `Procfile`):
-
+4. Run via high-performance WSGI server:
    ```bash
-   gunicorn core.wsgi:application --preload
+   gunicorn moviebooking.wsgi:application --workers 3 --timeout 120
    ```
----
-
-### 💡 Notes & Tips
-
-* Shows can auto-generate **10×10 seats** on creation. If you want dynamic rows/cols, store `rows` & `cols` on the `Show` model and generate accordingly.
-* Wrap seat booking in DB transactions to avoid double booking.
-* Consider rate limiting login/OTP endpoints in production.
 
 ---
 
-> Made with ❤️ for interview-ready, scalable backends.
+<p align="center">
+  Crafted with precision by <b>Siva Kumar</b> • Built for scalable, production-grade cinema management.
+</p>

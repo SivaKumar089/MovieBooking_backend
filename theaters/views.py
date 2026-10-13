@@ -17,7 +17,8 @@ class TheaterListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_authenticated and getattr(user, 'role', '') == 'owner':
+        managed = self.request.query_params.get('managed')
+        if managed == 'true' and user.is_authenticated and getattr(user, 'role', '') == 'owner':
             return Theater.objects.filter(owner=user)
         return Theater.objects.all()
 
@@ -40,7 +41,8 @@ class MovieListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_authenticated and getattr(user, 'role', '') == 'owner':
+        managed = self.request.query_params.get('managed')
+        if managed == 'true' and user.is_authenticated and getattr(user, 'role', '') == 'owner':
             queryset = Movie.objects.filter(owner=user)
         else:
             queryset = Movie.objects.all()
@@ -83,8 +85,9 @@ class ShowListCreateView(generics.ListCreateAPIView):
         queryset = Show.objects.all().select_related('movie', 'theater')
         user = self.request.user
         movie_id = self.request.query_params.get('movie')
+        managed = self.request.query_params.get('managed')
 
-        if user.is_authenticated and getattr(user, 'role', '') == 'owner':
+        if managed == 'true' and user.is_authenticated and getattr(user, 'role', '') == 'owner':
             queryset = queryset.filter(owner=user)
 
         if movie_id:
